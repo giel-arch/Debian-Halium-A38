@@ -119,6 +119,11 @@ jobs:
       - name: Build Image.gz (auto-fix strict-prototypes)
         run: |
           cd kernel
+          # Makefile direktori vendor memasang -Werror sendiri ->
+          # matikan di seluruh subdirektori vendor/oplus + klockopt/rootguard
+          for mk in $(find . -name Makefile | grep -E 'vendor/|klockopt|rootguard|sched_assist'); do
+            grep -q 'ccflags-remove' "$mk" || echo 'subdir-ccflags-remove := -Werror' >> "$mk"
+          done
           cat > /tmp/fixproto.py <<'FIX'
           import re, sys, collections
           errs = collections.defaultdict(set)
