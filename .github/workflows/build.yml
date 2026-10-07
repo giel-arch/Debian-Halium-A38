@@ -32,8 +32,10 @@ jobs:
           cd ..
           git clone --depth=1 -b "${KREF}" \
             https://github.com/oppo-source/android_kernel_modules_oppo_mt6769 modules
-          # symlink "../../vendor/..." di tree merujuk vendor DI ATAS workspace
-          mkdir -p "$GITHUB_WORKSPACE/../vendor"
+          # symlink "../../vendor/..." di tree menunjuk ke luar workspace;
+          # taruh salinan vendor di KEDUA kandidat lokasi resolusinya
+          mkdir -p "$GITHUB_WORKSPACE/vendor" "$GITHUB_WORKSPACE/../vendor"
+          cp -r modules/vendor/. "$GITHUB_WORKSPACE/vendor/" 2>/dev/null || true
           cp -r modules/vendor/. "$GITHUB_WORKSPACE/../vendor/" 2>/dev/null || true
           cp -rn modules/kernel/. kernel/ 2>/dev/null || true
           echo "vendor placed: $(ls "$GITHUB_WORKSPACE/../vendor" | head -3)"
@@ -66,9 +68,12 @@ jobs:
               if not missing:
                   print(f"converged iter {it}"); break
               for k, t in missing:
-                  if os.path.isfile(t) and not os.path.isdir(t):
-                      os.remove(t)
-                  os.makedirs(t, exist_ok=True)
+                  d = os.path.dirname(t)
+                  # parent bisa berupa file placeholder 57-byte atau
+                  # dangling symlink -> buang agar dir sungguhan bisa dibuat
+                  if os.path.islink(d) and not os.path.exists(d): os.remove(d)
+                  elif os.path.isfile(d): os.remove(d)
+                  os.makedirs(d, exist_ok=True)
                   open(os.path.join(t, 'Kconfig'), 'a').close()
                   if not os.path.exists(os.path.join(t, 'Makefile')):
                       open(os.path.join(t, 'Makefile'), 'w').write('obj-y := \n')
