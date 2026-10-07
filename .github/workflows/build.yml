@@ -3,9 +3,6 @@ name: Build Debian + Halium14 (Oppo A38)
 on:
   push:
     branches: [main]
-    paths:
-      - "halium/**"
-      - ".github/workflows/build-halium-debian.yml"
   workflow_dispatch:
 
 env:
@@ -56,7 +53,6 @@ jobs:
           # membuat stub-nya sekaligus (2-3 iterasi konvergen).
           python3 - <<'HEAL'
           import os, re, sys
-          os.chdir('kernel')
           for it in range(50):
               missing = []
               for dp, dn, fn in os.walk('.'):
