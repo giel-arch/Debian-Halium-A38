@@ -55,7 +55,26 @@ jobs:
           # membuat stub-nya sekaligus (2-3 iterasi konvergen).
           python3 - <<'HEAL'
           import os, re, sys
-          for it in range(50):
+
+          def force_real_dir(p):
+              # buang placeholder file / dangling symlink sepanjang path
+              while True:
+                  parent = os.path.dirname(p)
+                  if os.path.islink(p) and not os.path.exists(p): os.remove(p)
+                  elif os.path.exists(p) and not os.path.isdir(p): os.remove(p)
+                  else: break
+                  p = parent
+              os.makedirs(p, exist_ok=True)
+
+          def stub_dir(t):
+              if os.path.islink(t) and not os.path.exists(t): os.remove(t)
+              elif os.path.isfile(t): os.remove(t)
+              force_real_dir(os.path.dirname(t))
+              open(os.path.join(t, 'Kconfig'), 'a').close()
+              if not os.path.exists(os.path.join(t, 'Makefile')):
+                  open(os.path.join(t, 'Makefile'), 'w').write('obj-y := \n')
+
+          for it in range(80):
               missing = []
               for dp, dn, fn in os.walk('.'):
                   if 'Kconfig' not in fn: continue
@@ -67,19 +86,16 @@ jobs:
                       if not os.path.exists(t): missing.append((k, t))
               if not missing:
                   print(f"converged iter {it}"); break
+              print(f"heal iter {it}: {len(missing)} path")
+              ok = True
               for k, t in missing:
-                  d = os.path.dirname(t)
-                  # parent bisa berupa file placeholder 57-byte atau
-                  # dangling symlink -> buang agar dir sungguhan bisa dibuat
-                  if os.path.islink(d) and not os.path.exists(d): os.remove(d)
-                  elif os.path.isfile(d): os.remove(d)
-                  os.makedirs(d, exist_ok=True)
-                  open(os.path.join(t, 'Kconfig'), 'a').close()
-                  if not os.path.exists(os.path.join(t, 'Makefile')):
-                      open(os.path.join(t, 'Makefile'), 'w').write('obj-y := \n')
-              print(f"heal iter {it}: {len(missing)} stub")
+                  try:
+                      stub_dir(t)
+                  except Exception as e:
+                      ok = False; print("  stub gagal:", t, e)
+              if ok: pass
           else:
-              print("WARNING: belum konvergen 50 iter")
+              print("WARNING: belum konvergen")
           HEAL
           make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- k69v1_64_k419_defconfig
           ./scripts/config --file .config \
