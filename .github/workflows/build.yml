@@ -119,31 +119,33 @@ jobs:
       - name: Build Image.gz (auto-fix strict-prototypes)
         run: |
           cd kernel
-          set -o pipefail
+          cat > /tmp/fixproto.py <<'FIX'
+          import re, sys, collections
+          errs = collections.defaultdict(set)
+          for line in open(sys.argv[1], errors='ignore'):
+              m = re.search(r'([A-Za-z0-9_/.-]+\.[ch]):(\d+):\d+: error: function declaration isn.t a prototype', line)
+              if m: errs[m.group(1)].add(int(m.group(2)))
+          for f, lines in errs.items():
+              ls = open(f, errors='ignore').readlines()
+              for n in sorted(lines):
+                  ls[n-1] = re.sub(r'\(\)(\s*\{?)', r'(void)\1', ls[n-1])
+              open(f, 'w').writelines(ls)
+              print("fixed:", f, sorted(lines))
+          sys.exit(0 if errs else 3)
+          FIX
           for i in 1 2 3 4 5; do
             LOG=$(mktemp)
             if make -j"$(nproc)" ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
-                 KCFLAGS="-Wno-error" Image.gz 2>&1 | tee "$LOG"; then
-              echo "build sukses (iter $i)"; break
+                 KCFLAGS="-Wno-error" Image.gz > "$LOG" 2>&1; then
+              echo "build sukses (iter $i)"; tail -5 "$LOG"; break
             fi
             echo "build gagal (iter $i) — auto-fix"
-            python3 - "$LOG" <<'PY'
-            import re, sys, collections
-            errs = collections.defaultdict(set)
-            for line in open(sys.argv[1], errors='ignore'):
-                m = re.search(r'([A-Za-z0-9_/.-]+\.[ch]):(\d+):\d+: error: function declaration isn.t a prototype', line)
-                if m: errs[m.group(1)].add(int(m.group(2)))
-            for f, lines in errs.items():
-                ls = open(f, errors='ignore').readlines()
-                for n in sorted(lines):
-                    ls[n-1] = re.sub(r'\(\)(\s*\{?)', r'(void)\1', ls[n-1])
-                open(f, 'w').writelines(ls)
-                print("fixed:", f, sorted(lines))
-            PY
-            grep -c 'isn.t a prototype' "$LOG" >/dev/null 2>&1
-            if ! grep -qE 'isn.t a prototype' "$LOG"; then
-              echo "error bukan strict-prototypes — lihat log:"; tail -40 "$LOG"; exit 1
+            if python3 /tmp/fixproto.py "$LOG"; then
+              tail -20 "$LOG"
+              continue
             fi
+            echo "bukan strict-prototypes — log:"; tail -40 "$LOG"
+            exit 1
           done
           test -f arch/arm64/boot/Image.gz || { echo "Image.gz tidak ada"; exit 1; }
           ls -la arch/arm64/boot/Image.gz
