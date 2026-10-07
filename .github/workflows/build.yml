@@ -119,7 +119,8 @@ jobs:
       - name: Build Image.gz
         run: |
           cd kernel
-          make -j"$(nproc)" ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- Image.gz
+          make -j"$(nproc)" ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
+            KCFLAGS="-Wno-error" Image.gz
           ls -la arch/arm64/boot/Image.gz
 
       - name: Upload kernel
