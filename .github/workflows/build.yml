@@ -119,11 +119,11 @@ jobs:
       - name: Build Image.gz (auto-fix strict-prototypes)
         run: |
           cd kernel
-          # Makefile direktori vendor memasang -Werror sendiri ->
-          # matikan di seluruh subdirektori vendor/oplus + klockopt/rootguard
-          for mk in $(find . -name Makefile | grep -E 'vendor/|klockopt|rootguard|sched_assist'); do
-            grep -q 'ccflags-remove' "$mk" || echo 'subdir-ccflags-remove := -Werror' >> "$mk"
-          done
+          # NUKLIR: hapus -Werror dari SEMUA Makefile/Kbuild di tree
+          # (vendor menaruhnya di berbagai level; klocktest dkk. file test)
+          find . \( -name Makefile -o -name Kbuild \) -type f \
+            -exec sed -i 's/-Werror//g' {} +
+          echo "-Werror stripped dari seluruh Makefile"
           cat > /tmp/fixproto.py <<'FIX'
           import re, sys, collections
           errs = collections.defaultdict(set)
