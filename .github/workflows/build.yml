@@ -122,7 +122,7 @@ jobs:
           # NUKLIR: hapus -Werror dari SEMUA Makefile/Kbuild di tree
           # (vendor menaruhnya di berbagai level; klocktest dkk. file test)
           find . \( -name Makefile -o -name Kbuild \) -type f \
-            -exec sed -i 's/-Werror//g' {} +
+            -exec sed -i -E 's/[[:space:]]-Werror([=][^[:space:]]*)?//g' {} +
           echo "-Werror stripped dari seluruh Makefile"
           cat > /tmp/fixproto.py <<'FIX'
           import re, sys, collections
