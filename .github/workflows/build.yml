@@ -57,19 +57,28 @@ jobs:
           import os, re, sys
 
           def force_real_dir(p):
-              # buang placeholder file / dangling symlink sepanjang path
+              # hanya buang PLACEHOLDER (<256 byte) / dangling symlink;
+              # FILE ASLI tidak pernah disentuh (bug: sched.h 68KB pernah
+              # terhapus oleh source-path vendor yang aneh)
               while True:
                   parent = os.path.dirname(p)
                   if os.path.islink(p) and not os.path.exists(p): os.remove(p)
-                  elif os.path.exists(p) and not os.path.isdir(p): os.remove(p)
+                  elif os.path.exists(p) and not os.path.isdir(p):
+                      if os.path.getsize(p) < 256: os.remove(p)
+                      else:
+                          print("SKIP (file asli menghalangi):", p)
+                          return False
                   else: break
                   p = parent
               os.makedirs(p, exist_ok=True)
+              return True
 
           def stub_dir(t):
               if os.path.islink(t) and not os.path.exists(t): os.remove(t)
-              elif os.path.isfile(t): os.remove(t)
-              force_real_dir(os.path.dirname(t))
+              elif os.path.isfile(t) and os.path.getsize(t) < 256: os.remove(t)
+              elif os.path.isfile(t):
+                  print("SKIP stub (file asli):", t); return
+              if not force_real_dir(os.path.dirname(t)): return
               open(os.path.join(t, 'Kconfig'), 'a').close()
               if not os.path.exists(os.path.join(t, 'Makefile')):
                   open(os.path.join(t, 'Makefile'), 'w').write('obj-y := \n')
