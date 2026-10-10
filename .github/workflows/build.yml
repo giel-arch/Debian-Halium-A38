@@ -50,62 +50,9 @@ jobs:
       - name: Konfigurasi (k69v1_64_k419 + fragment Halium)
         run: |
           cd kernel
-          # Healer Kconfig: tree Oppo penuh placeholder/symlink mati.
-          # Python menghitung closure semua `source` yang hilang dan
-          # membuat stub-nya sekaligus (2-3 iterasi konvergen).
-          python3 - <<'HEAL'
-          import os, re, sys
-
-          def force_real_dir(p):
-              # hanya buang PLACEHOLDER (<256 byte) / dangling symlink;
-              # FILE ASLI tidak pernah disentuh (bug: sched.h 68KB pernah
-              # terhapus oleh source-path vendor yang aneh)
-              while True:
-                  parent = os.path.dirname(p)
-                  if os.path.islink(p) and not os.path.exists(p): os.remove(p)
-                  elif os.path.exists(p) and not os.path.isdir(p):
-                      if os.path.getsize(p) < 256: os.remove(p)
-                      else:
-                          print("SKIP (file asli menghalangi):", p)
-                          return False
-                  else: break
-                  p = parent
-              os.makedirs(p, exist_ok=True)
-              return True
-
-          def stub_dir(t):
-              if os.path.islink(t) and not os.path.exists(t): os.remove(t)
-              elif os.path.isfile(t) and os.path.getsize(t) < 256: os.remove(t)
-              elif os.path.isfile(t):
-                  print("SKIP stub (file asli):", t); return
-              if not force_real_dir(os.path.dirname(t)): return
-              open(os.path.join(t, 'Kconfig'), 'a').close()
-              if not os.path.exists(os.path.join(t, 'Makefile')):
-                  open(os.path.join(t, 'Makefile'), 'w').write('obj-y := \n')
-
-          for it in range(80):
-              missing = []
-              for dp, dn, fn in os.walk('.'):
-                  if 'Kconfig' not in fn: continue
-                  k = os.path.join(dp, 'Kconfig')
-                  try: txt = open(k, errors='ignore').read()
-                  except Exception: continue
-                  for m in re.finditer(r'^\s*source\s+"([^"]+)"', txt, re.M):
-                      t = os.path.normpath(os.path.join(dp, m.group(1)))
-                      if not os.path.exists(t): missing.append((k, t))
-              if not missing:
-                  print(f"converged iter {it}"); break
-              print(f"heal iter {it}: {len(missing)} path")
-              ok = True
-              for k, t in missing:
-                  try:
-                      stub_dir(t)
-                  except Exception as e:
-                      ok = False; print("  stub gagal:", t, e)
-              if ok: pass
-          else:
-              print("WARNING: belum konvergen")
-          HEAL
+          # Healer tree Oppo (placeholder symlink-dump + Kconfig stub)
+          # TERUJI LOKAL: defconfig k69v1_64_k419 lolos dengan healer ini
+          python3 "$GITHUB_WORKSPACE/scripts/heal-kconfig.py" .
           make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- k69v1_64_k419_defconfig
           ./scripts/config --file .config \
             --enable CONFIG_IKCONFIG \
